@@ -1,4 +1,4 @@
-# FastAPI 服务
+# ComfyUI FastAPI 服务
 
 通过 FastAPI 调用 ComfyUI。
 
@@ -10,25 +10,30 @@
 ## 目录结构
 
 ```text
-server/fastapi/
-├── README.md
-├── requirements.txt
-└── app/
-    ├── main.py
-    └── backends/
-        └── comfyui/
-            ├── client.py
-            └── workflows/
-                ├── qwen-image-2512_api.json
-                └── qwen-image-edit-2511_api.json
+aigc/
+└── deploy/
+    └── comfyui/
+        └── server/
+            └── fastapi/
+                ├── README.md
+                ├── requirements.txt
+                └── app/
+                    ├── __init__.py
+                    ├── main.py
+                    ├── comfyui_client.py
+                    └── workflows/
+                        ├── qwen-image-2512_api.json
+                        └── qwen-image-edit-2511_api.json
 ```
 
-`.venv` 虚拟环境不上传 GitHub。
+## 创建 FastAPI 虚拟环境
 
-首次部署或 clone 项目后，在当前目录根据 `requirements.txt` 创建环境：
+`.venv` 不上传 GitHub。
+
+首次部署时，根据 `requirements.txt` 创建虚拟环境：
 
 ```bash
-cd /root/autodl-tmp/aigc/server/fastapi
+cd /root/autodl-tmp/aigc/deploy/comfyui/server/fastapi
 
 python -m venv .venv
 
@@ -39,28 +44,65 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-以后启动服务时只需要激活环境：
+以后启动 FastAPI 时，只需要激活虚拟环境：
 
 ```bash
-cd /root/autodl-tmp/aigc/server/fastapi
+cd /root/autodl-tmp/aigc/deploy/comfyui/server/fastapi
 
 source .venv/bin/activate
 ```
 
-## 启动 FastAPI
+## 启动 ComfyUI
 
-确保 ComfyUI 已运行在：
+ComfyUI 目录：
 
 ```text
-127.0.0.1:8188
+/root/autodl-tmp/ComfyUI
 ```
 
-启动 FastAPI：
+启动命令：
 
 ```bash
+cd /root/autodl-tmp/ComfyUI
+
+source .venv/bin/activate
+
+python main.py \
+  --listen 127.0.0.1 \
+  --port 8188 \
+  --extra-model-paths-config /root/autodl-tmp/ComfyUI/extra_model_paths.yaml
+```
+
+ComfyUI 地址：
+
+```text
+http://127.0.0.1:8188
+```
+
+FastAPI 通过 `comfyui_client.py` 调用该服务。
+
+## 启动 FastAPI
+
+```bash
+cd /root/autodl-tmp/aigc/deploy/comfyui/server/fastapi
+
+source .venv/bin/activate
+
 uvicorn app.main:app \
   --host 0.0.0.0 \
   --port 8000
+```
+
+FastAPI 地址：
+
+```text
+http://127.0.0.1:8000
+```
+
+Swagger：
+
+```text
+http://127.0.0.1:8000/docs
 ```
 
 健康检查：
@@ -71,13 +113,13 @@ GET /health
 
 ## Qwen-Image-2512
 
-文生图：
+文生图接口：
 
 ```text
 POST /v1/images/qwen-image-2512/generate
 ```
 
-请求：
+请求示例：
 
 ```json
 {
@@ -94,19 +136,21 @@ POST /v1/images/qwen-image-2512/generate
 ```json
 {
   "model": "qwen-image-2512",
-  "images": ["base64..."]
+  "images": [
+    "base64..."
+  ]
 }
 ```
 
 ## Qwen-Image-Edit-2511
 
-图片编辑：
+图片编辑接口：
 
 ```text
 POST /v1/images/qwen-image-edit-2511/edit
 ```
 
-请求：
+请求示例：
 
 ```json
 {
@@ -123,7 +167,9 @@ POST /v1/images/qwen-image-edit-2511/edit
 ```json
 {
   "model": "qwen-image-edit-2511",
-  "images": ["base64..."]
+  "images": [
+    "base64..."
+  ]
 }
 ```
 
@@ -133,6 +179,8 @@ POST /v1/images/qwen-image-edit-2511/edit
 客户端
   ↓
 FastAPI :8000
+  ↓
+comfyui_client.py
   ↓
 ComfyUI :8188
   ↓
