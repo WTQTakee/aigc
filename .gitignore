@@ -1,0 +1,5 @@
+.venv/
+deploy/server/fastapi/app/.venv/
+__pycache__/
+*.pyc
+*.log

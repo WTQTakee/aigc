@@ -1,0 +1,267 @@
+{
+  "2": {
+    "inputs": {
+      "pixels": [
+        "18",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE编码"
+    }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "加载VAE"
+    }
+  },
+  "4": {
+    "inputs": {
+      "strength": 1,
+      "pre_cfg": false,
+      "model": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "CFGNorm",
+    "_meta": {
+      "title": "CFG归一化"
+    }
+  },
+  "5": {
+    "inputs": {
+      "shift": 3.1,
+      "model": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "采样算法（AuraFlow）"
+    }
+  },
+  "6": {
+    "inputs": {
+      "conditioning": [
+        "20",
+        0
+      ],
+      "latent": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "参考Latent"
+    }
+  },
+  "7": {
+    "inputs": {
+      "noise_seed": 937026325566296
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "随机噪波"
+    }
+  },
+  "8": {
+    "inputs": {
+      "model": [
+        "4",
+        0
+      ],
+      "conditioning": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "基本引导器"
+    }
+  },
+  "9": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "K采样器选择"
+    }
+  },
+  "10": {
+    "inputs": {
+      "noise": [
+        "7",
+        0
+      ],
+      "guider": [
+        "8",
+        0
+      ],
+      "sampler": [
+        "9",
+        0
+      ],
+      "sigmas": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "17",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "自定义采样器（高级）"
+    }
+  },
+  "11": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 4,
+      "denoise": 1,
+      "model": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "基本调度器"
+    }
+  },
+  "12": {
+    "inputs": {
+      "samples": [
+        "10",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
+  },
+  "13": {
+    "inputs": {
+      "input1": [
+        "12",
+        0
+      ]
+    },
+    "_meta": {}
+  },
+  "14": {
+    "inputs": {
+      "unet_name": "qwen_image_edit_2511_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNet加载器"
+    }
+  },
+  "15": {
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "加载CLIP"
+    }
+  },
+  "16": {
+    "inputs": {
+      "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoRA加载器（仅模型）"
+    }
+  },
+  "17": {
+    "inputs": {
+      "width": 864,
+      "height": 1536,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "空Latent图像"
+    }
+  },
+  "18": {
+    "inputs": {
+      "UNKNOWN": "#000000",
+      "image": [
+        "21",
+        0
+      ]
+    },
+    "_meta": {}
+  },
+  "20": {
+    "inputs": {
+      "prompt": "This is a product image. Please perform the following edits:\n\nKEEP (do not remove):\n- All text that is physically printed, embossed, or engraved on the product itself, including: brand logos, product names, book titles, packaging labels, ingredient lists, instruction manual text, serial numbers, and any typography that is an inherent part of the product design.\n\nREMOVE:\n- All other text overlays that do NOT belong to the product, including: promotional banners, price tags, watermarks, sticker text, advertising slogans, captions, subtitles, marketing copy, corner badges, and any text added on top of the image.\n\nINPAINT:\n- After removing the text, seamlessly reconstruct the area underneath using the surrounding background's color, texture, lighting, and material. The result should look as if the removed text had never been there - no blur, no smudge, no patch artifacts.\n\nPRESERVE:\n- Do not alter the product's shape, color, position, or proportions.\n- Do not change the overall background style, tone, or composition.\n\nWhen in doubt whether a text is part of the product or an overlay, KEEP it.\n\nOutput: a clean product image where the product's native text is fully retained, and all extraneous text is naturally erased with the background perfectly restored.",
+      "clip": [
+        "15",
+        0
+      ],
+      "image1": [
+        "18",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus(positive,vae不要连)"
+    }
+  },
+  "21": {
+    "inputs": {
+      "image": "adams_user_takeewang/企业微信截图_5c844e1b-1c9f-4f08-b664-1f5ff1365ec7.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "加载图像"
+    }
+  },
+  "22": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "保存图像"
+    }
+  }
+}
