@@ -4,8 +4,9 @@
 
 当前支持：
 
-* qwen-image-2512
-* qwen-image-edit-2511
+- qwen-image-2512
+- qwen-image-edit-2511
+- ltx-2.3
 
 ## 目录结构
 
@@ -23,7 +24,8 @@ aigc/
                     ├── comfyui_client.py
                     └── workflows/
                         ├── qwen-image-2512_api.json
-                        └── qwen-image-edit-2511_api.json
+                        ├── qwen-image-edit-2511_api.json
+                        └── ltx-2.3-t2v-i2v-two-stage-distilled_api.json
 ```
 
 ## 创建 FastAPI 虚拟环境
@@ -78,8 +80,6 @@ ComfyUI 地址：
 ```text
 http://127.0.0.1:8188
 ```
-
-FastAPI 通过 `comfyui_client.py` 调用该服务。
 
 ## 启动 FastAPI
 
@@ -171,6 +171,63 @@ POST /v1/images/qwen-image-edit-2511/edit
     "base64..."
   ]
 }
+```
+
+## LTX-2.3
+
+视频生成接口：
+
+```text
+POST /v1/videos/ltx-2.3/generate
+```
+
+支持：
+
+```text
+T2V：不传 image
+I2V：传入 image
+```
+
+### T2V 请求示例
+
+```json
+{
+  "prompt": "A cinematic shot of a woman walking through Tokyo at night",
+  "width": 960,
+  "height": 544,
+  "frames": 121,
+  "fps": 24
+}
+```
+
+### I2V 请求示例
+
+```json
+{
+  "image": "base64...",
+  "prompt": "The woman slowly walks forward while the camera pushes in",
+  "width": 960,
+  "height": 544,
+  "frames": 121,
+  "fps": 24
+}
+```
+
+返回：
+
+```json
+{
+  "model": "ltx-2.3",
+  "videos": [
+    "base64..."
+  ]
+}
+```
+
+LTX-2.3 使用的 ComfyUI API workflow：
+
+```text
+ltx-2.3-t2v-i2v-two-stage-distilled_api.json
 ```
 
 ## 调用流程
