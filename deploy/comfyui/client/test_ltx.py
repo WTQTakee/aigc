@@ -38,7 +38,10 @@ def test_t2v():
         timeout=None,
     )
 
-    response.raise_for_status()
+    if not response.ok:
+        print("状态码:", response.status_code)
+        print("服务端返回:", response.text)
+        raise RuntimeError("LTX-2.3 请求失败")
 
     result = response.json()
 

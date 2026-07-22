@@ -68,6 +68,7 @@ ComfyUI 目录：
 cd /root/autodl-tmp/ComfyUI
 
 source .venv/bin/activate
+export OMP_NUM_THREADS=8
 
 python main.py \
   --listen 127.0.0.1 \

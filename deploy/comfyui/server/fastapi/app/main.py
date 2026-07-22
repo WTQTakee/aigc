@@ -1,4 +1,3 @@
-```python id="w9htx2"
 import json
 import random
 from pathlib import Path
@@ -255,4 +254,4 @@ async def ltx_23_generate(
         "model": "ltx-2.3",
         "videos": videos,
     }
-```
+
