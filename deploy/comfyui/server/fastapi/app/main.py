@@ -244,14 +244,16 @@ async def ltx_23_generate(
     videos = [
         file["base64"]
         for file in files
-        if file["type"] in (
-            "video",
-            "gif",
-        )
+        if file["type"] == "video"
     ]
+
+    if not videos:
+        raise RuntimeError(
+            f"没有识别到视频输出，files={files}"
+        )
 
     return {
         "model": "ltx-2.3",
         "videos": videos,
-    }
+}
 

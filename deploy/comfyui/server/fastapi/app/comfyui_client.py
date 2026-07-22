@@ -1,11 +1,29 @@
 import asyncio
 import base64
 import uuid
+from pathlib import Path
 
 import httpx
 
 
 COMFYUI_URL = "http://127.0.0.1:8188"
+
+IMAGE_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".bmp",
+}
+
+VIDEO_EXTENSIONS = {
+    ".mp4",
+    ".webm",
+    ".mov",
+    ".mkv",
+    ".avi",
+    ".gif",
+}
 
 
 async def upload_image(image_base64: str) -> str:
@@ -32,12 +50,39 @@ async def upload_image(image_base64: str) -> str:
 
         response.raise_for_status()
 
-    return filename
+        result = response.json()
+
+    return result.get("name", filename)
+
+
+def get_file_type(
+    filename: str,
+    output_key: str,
+) -> str:
+    extension = Path(filename).suffix.lower()
+
+    if extension in IMAGE_EXTENSIONS:
+        return "image"
+
+    if extension in VIDEO_EXTENSIONS:
+        return "video"
+
+    output_key = output_key.lower()
+
+    if "video" in output_key:
+        return "video"
+
+    if "gif" in output_key:
+        return "video"
+
+    if "image" in output_key:
+        return "image"
+
+    return "file"
 
 
 async def run_workflow(workflow: dict) -> list[dict]:
     async with httpx.AsyncClient(timeout=None) as client:
-        # 提交 workflow
         response = await client.post(
             f"{COMFYUI_URL}/prompt",
             json={
@@ -45,11 +90,14 @@ async def run_workflow(workflow: dict) -> list[dict]:
             },
         )
 
-        response.raise_for_status()
+        if not response.is_success:
+            raise RuntimeError(
+                "ComfyUI 提交 workflow 失败: "
+                f"{response.status_code} {response.text}"
+            )
 
         prompt_id = response.json()["prompt_id"]
 
-        # 等待任务完成
         while True:
             response = await client.get(
                 f"{COMFYUI_URL}/history/{prompt_id}",
@@ -64,13 +112,27 @@ async def run_workflow(workflow: dict) -> list[dict]:
 
             await asyncio.sleep(1)
 
-        outputs = history[prompt_id]["outputs"]
+        prompt_result = history[prompt_id]
+
+        status = prompt_result.get("status", {})
+
+        if status.get("status_str") == "error":
+            raise RuntimeError(
+                f"ComfyUI 执行失败: {status}"
+            )
+
+        outputs = prompt_result.get(
+            "outputs",
+            {},
+        )
 
         files = []
 
-        # 获取输出文件
-        for output in outputs.values():
-            for output_type, items in output.items():
+        for node_id, output in outputs.items():
+            if not isinstance(output, dict):
+                continue
+
+            for output_key, items in output.items():
                 if not isinstance(items, list):
                     continue
 
@@ -100,15 +162,19 @@ async def run_workflow(workflow: dict) -> list[dict]:
 
                     response.raise_for_status()
 
-                    file_base64 = base64.b64encode(
-                        response.content,
-                    ).decode("utf-8")
+                    file_type = get_file_type(
+                        filename,
+                        output_key,
+                    )
 
                     files.append(
                         {
-                            "type": output_type.rstrip("s"),
+                            "type": file_type,
                             "filename": filename,
-                            "base64": file_base64,
+                            "node_id": node_id,
+                            "base64": base64.b64encode(
+                                response.content
+                            ).decode("utf-8"),
                         }
                     )
 
