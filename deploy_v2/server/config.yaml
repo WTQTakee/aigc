@@ -1,0 +1,20 @@
+gateway:
+  host: 0.0.0.0
+  port: 8000
+  request_timeout: 3600
+  routes:
+    /v1/images: comfyui_api
+    /v1/videos: comfyui_api
+
+services:
+  comfyui_api:
+    base_url: http://127.0.0.1:8100
+    host: 127.0.0.1
+    port: 8100
+    comfyui_url: http://127.0.0.1:8188
+    poll_interval: 1
+    workflow_timeout: 1800
+    workflows:
+      qwen-image-2512: qwen-image-2512_api.json
+      qwen-image-edit-2511: qwen-image-edit-2511_api.json
+      ltx-2.3: ltx-2.3-t2v-i2v-two-stage-distilled_api.json

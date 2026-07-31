@@ -18,10 +18,11 @@ http://127.0.0.1:8000
 如果 FastAPI 部署在 AutoDL，需要先在本地建立 SSH Tunnel。
 
 ```bash
-ssh -N \
+ssh -fN \
+  -o ExitOnForwardFailure=yes \
   -L 8000:127.0.0.1:8000 \
-  root@connect.bjb1.seetacloud.com \
-  -p 3940
+  -p 3940 \
+  root@connect.bjb1.seetacloud.com
 ```
 
 ## 安装依赖
