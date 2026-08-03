@@ -140,7 +140,7 @@ ssh -N -L 8002:127.0.0.1:8000 \
 
 ```bash
 ./.venv/bin/python example.py text-to-image \
-  --base-url http://127.0.0.1:8000 \
+  --base-url http://127.0.0.1:8002 \
   --prompt "A cinematic portrait in Tokyo at night"
 ```
 
@@ -148,7 +148,7 @@ ssh -N -L 8002:127.0.0.1:8000 \
 
 ```bash
 ./.venv/bin/python example.py edit-image \
-  --base-url http://127.0.0.1:8000 \
+  --base-url http://127.0.0.1:8002 \
   --input input.png \
   --prompt "Change the background to a Tokyo street"
 ```
@@ -157,7 +157,7 @@ ssh -N -L 8002:127.0.0.1:8000 \
 
 ```bash
 ./.venv/bin/python example.py text-to-video \
-  --base-url http://127.0.0.1:8000 \
+  --base-url http://127.0.0.1:8002 \
   --prompt "A woman walks through a neon street"
 ```
 
@@ -165,7 +165,7 @@ ssh -N -L 8002:127.0.0.1:8000 \
 
 ```bash
 ./.venv/bin/python example.py image-to-video \
-  --base-url http://127.0.0.1:8000 \
+  --base-url http://127.0.0.1:8002 \
   --input input.png \
   --prompt "The camera slowly pushes in"
 ```
