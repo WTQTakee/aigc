@@ -111,15 +111,36 @@ curl http://127.0.0.1:8000/health
 
 ```bash
 cd aigc/deploy_v2/client
-python -m venv .venv
+python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
+```
+
+### 通过 SSH 隧道访问 AutoDL Gateway（推荐）
+
+AutoDL 实例通常不能直接从公网访问 `8000` 端口。先在 AutoDL 实例页面复制 SSH 登录命令，例如：
+
+```bash
+ssh -p 35394 root@region-1.autodl.com
+```
+
+然后在本地终端建立 SSH 隧道，将本地 `8000` 端口转发到 AutoDL 实例的 Gateway：
+
+```bash
+ssh -N -L 8000:127.0.0.1:8000 \
+  -p 35394 root@region-1.autodl.com
+```
+
+请将示例中的 SSH 地址和端口替换为自己实例页面显示的值，并保持这个终端运行。隧道建立后，以下客户端命令统一使用：
+
+```bash
+--base-url http://127.0.0.1:8000
 ```
 
 文生图：
 
 ```bash
 ./.venv/bin/python example.py text-to-image \
-  --base-url http://<AutoDL 地址>:8000 \
+  --base-url http://127.0.0.1:8000 \
   --prompt "A cinematic portrait in Tokyo at night"
 ```
 
@@ -127,7 +148,7 @@ python -m venv .venv
 
 ```bash
 ./.venv/bin/python example.py edit-image \
-  --base-url http://<AutoDL 地址>:8000 \
+  --base-url http://127.0.0.1:8000 \
   --input input.png \
   --prompt "Change the background to a Tokyo street"
 ```
@@ -136,7 +157,7 @@ python -m venv .venv
 
 ```bash
 ./.venv/bin/python example.py text-to-video \
-  --base-url http://<AutoDL 地址>:8000 \
+  --base-url http://127.0.0.1:8000 \
   --prompt "A woman walks through a neon street"
 ```
 
@@ -144,7 +165,7 @@ python -m venv .venv
 
 ```bash
 ./.venv/bin/python example.py image-to-video \
-  --base-url http://<AutoDL 地址>:8000 \
+  --base-url http://127.0.0.1:8000 \
   --input input.png \
   --prompt "The camera slowly pushes in"
 ```
