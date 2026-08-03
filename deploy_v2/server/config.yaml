@@ -1,7 +1,7 @@
 gateway:
   host: 0.0.0.0
   port: 8000
-  request_timeout: 3600
+  request_timeout: 600
   routes:
     /v1/images: comfyui_api
     /v1/videos: comfyui_api
@@ -13,7 +13,7 @@ services:
     port: 8100
     comfyui_url: http://127.0.0.1:8188
     poll_interval: 1
-    workflow_timeout: 1800
+    workflow_timeout: 600
     workflows:
       qwen-image-2512: qwen-image-2512_api.json
       qwen-image-edit-2511: qwen-image-edit-2511_api.json

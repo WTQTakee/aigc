@@ -120,14 +120,14 @@ python3 -m venv .venv
 AutoDL 实例通常不能直接从公网访问 `8000` 端口。先在 AutoDL 实例页面复制 SSH 登录命令，例如：
 
 ```bash
-ssh -p 35394 root@region-1.autodl.com
+ssh -p 39402 root@connect.bjb1.seetacloud.com
 ```
 
 然后在本地终端建立 SSH 隧道，将本地 `8000` 端口转发到 AutoDL 实例的 Gateway：
 
 ```bash
-ssh -N -L 8000:127.0.0.1:8000 \
-  -p 35394 root@region-1.autodl.com
+ssh -N -L 8002:127.0.0.1:8000 \
+  -p 39402 root@connect.bjb1.seetacloud.com
 ```
 
 请将示例中的 SSH 地址和端口替换为自己实例页面显示的值，并保持这个终端运行。隧道建立后，以下客户端命令统一使用：
