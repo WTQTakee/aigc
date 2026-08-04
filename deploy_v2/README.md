@@ -133,7 +133,7 @@ ssh -N -L 8002:127.0.0.1:8000 \
 请将示例中的 SSH 地址和端口替换为自己实例页面显示的值，并保持这个终端运行。隧道建立后，以下客户端命令统一使用：
 
 ```bash
---base-url http://127.0.0.1:8000
+--base-url http://127.0.0.1:8002
 ```
 
 文生图：
@@ -152,6 +152,73 @@ ssh -N -L 8002:127.0.0.1:8000 \
   --input input.png \
   --prompt "Change the background to a Tokyo street"
 ```
+
+### Qwen-Image-Edit-2511 三图编辑（Lightning 4 步）
+
+工作流文件：
+
+```text
+server/comfyui_api/app/workflows/qwen-image-edit-2511-multi-lightning-4step_api.json
+```
+
+该工作流使用原生 `TextEncodeQwenImageEditPlus`，固定接收三张图片：
+
+| 图片 | `LoadImage` 节点 | 用途 |
+|---|---:|---|
+| `image1` | `21` | 主图 |
+| `image2` | `23` | 参考图 |
+| `image3` | `24` | 参考图 |
+
+它默认加载以下模型：
+
+```text
+models/diffusion_models/qwen_image_edit_2511_bf16.safetensors
+models/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors
+models/vae/qwen_image_vae.safetensors
+models/loras/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors
+```
+
+当前 `/v1/images/qwen-image-edit-2511/edit` 接口只接收单图，因此三图工作流需要先在 AutoDL 实例内直接调用 ComfyUI API。先把三张图片上传到 ComfyUI：
+
+```bash
+curl -sS -X POST http://127.0.0.1:8188/upload/image \
+  -F 'image=@/root/autodl-tmp/input-1.png' \
+  -F 'overwrite=true'
+
+curl -sS -X POST http://127.0.0.1:8188/upload/image \
+  -F 'image=@/root/autodl-tmp/input-2.png' \
+  -F 'overwrite=true'
+
+curl -sS -X POST http://127.0.0.1:8188/upload/image \
+  -F 'image=@/root/autodl-tmp/input-3.png' \
+  -F 'overwrite=true'
+```
+
+上传接口会返回图片的 `name`。如果返回的名称不是 `input-1.png`、`input-2.png` 和 `input-3.png`，请在下面命令中使用实际返回值。提交工作流：
+
+```bash
+cd /root/autodl-tmp/aigc/deploy_v2/server/comfyui_api
+
+jq --arg prompt \
+  'Use image 1 as the main image. Put the person from image 2 in the scene, using image 3 as the clothing reference.' \
+  '."21".inputs.image = "input-1.png"
+   | ."23".inputs.image = "input-2.png"
+   | ."24".inputs.image = "input-3.png"
+   | ."20".inputs.prompt = $prompt
+   | {prompt: .}' \
+  app/workflows/qwen-image-edit-2511-multi-lightning-4step_api.json \
+  | curl -sS -X POST http://127.0.0.1:8188/prompt \
+      -H 'Content-Type: application/json' \
+      --data-binary @-
+```
+
+请求成功后会返回 `prompt_id`。生成结果由 `SaveImage` 节点写入：
+
+```text
+/root/autodl-tmp/ComfyUI/output/
+```
+
+该工作流默认输出尺寸为 `864x1536`，采样步数为 `4`。可在提交前通过 `jq` 修改节点 `17` 的 `width`、`height`，以及节点 `7` 的 `noise_seed`。
 
 文生视频：
 
