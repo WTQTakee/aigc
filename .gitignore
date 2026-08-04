@@ -3,3 +3,4 @@ deploy/server/fastapi/app/.venv/
 __pycache__/
 *.pyc
 *.log
+deploy_v2/.runtime/

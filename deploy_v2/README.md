@@ -65,44 +65,45 @@ services:
 
 要求 Python 3.10 或更高版本。
 
-### 1. 启动 ComfyUI
-
-ComfyUI 继续使用它自己的 venv：
+在 AutoDL 实例中执行：
 
 ```bash
-cd /root/autodl-tmp/ComfyUI
-source .venv/bin/activate
-export OMP_NUM_THREADS=8
-python main.py \
-  --listen 127.0.0.1 \
-  --port 8188 \
-  --extra-model-paths-config /root/autodl-tmp/ComfyUI/extra_model_paths.yaml
+cd /root/autodl-tmp/aigc/deploy_v2/server
+chmod +x start.sh
+./start.sh
 ```
 
-### 2. 启动 ComfyUI API
+`start.sh` 会自动完成：
 
-```bash
-cd /root/autodl-tmp/aigc/deploy_v2/server/comfyui_api
-python -m venv .venv
-./.venv/bin/pip install -r requirements.txt
-./.venv/bin/python -m app
-```
+1. 检查 Python 版本、ComfyUI 目录、ComfyUI venv 和 `extra_model_paths.yaml`。
+2. 为 ComfyUI API 和 Gateway 创建独立的 `.venv`。
+3. 仅在 `requirements.txt` 变化时重新安装依赖。
+4. 后台依次启动 ComfyUI `:8188`、ComfyUI API `:8100` 和 Gateway `:8000`。
+5. 等待每个服务通过健康检查，再启动下一个服务。
+6. 将 PID 和日志写入 `deploy_v2/.runtime/`。
 
-该服务默认只监听 `127.0.0.1:8100`。
-
-### 3. 启动 Gateway
-
-```bash
-cd /root/autodl-tmp/aigc/deploy_v2/server/gateway
-python -m venv .venv
-./.venv/bin/pip install -r requirements.txt
-./.venv/bin/python -m app
-```
-
-Gateway 默认监听 `0.0.0.0:8000`。检查 Gateway 及内部服务：
+脚本可以重复执行；如果对应健康检查已经可用，不会重复启动服务。检查整体状态：
 
 ```bash
 curl http://127.0.0.1:8000/health
+```
+
+查看日志：
+
+```bash
+tail -f /root/autodl-tmp/aigc/deploy_v2/.runtime/logs/comfyui.log
+tail -f /root/autodl-tmp/aigc/deploy_v2/.runtime/logs/comfyui-api.log
+tail -f /root/autodl-tmp/aigc/deploy_v2/.runtime/logs/gateway.log
+```
+
+默认路径和启动参数可以通过环境变量覆盖：
+
+```bash
+COMFYUI_DIR=/root/autodl-tmp/ComfyUI \
+PYTHON_BIN=python3 \
+OMP_NUM_THREADS=8 \
+STARTUP_TIMEOUT=300 \
+./start.sh
 ```
 
 对公网开放时，建议在 Gateway 前放置 Nginx/Caddy，添加 HTTPS 和鉴权。
