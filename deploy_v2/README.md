@@ -153,7 +153,61 @@ ssh -N -L 8002:127.0.0.1:8000 \
   --prompt "Change the background to a Tokyo street"
 ```
 
-### Qwen-Image-Edit-2511 三图编辑（Lightning 4 步）
+上面的 `edit-image` 默认调用单图满血版。Qwen-Image-Edit-2511 当前提供四种 API：
+
+| 模式 | 工作流 | Gateway 接口 |
+|---|---|---|
+| 单图满血版 | `qwen-image-edit-2511_api.json` | `POST /v1/images/qwen-image-edit-2511/edit` |
+| 单图 Lightning 4 步 | `qwen-image-edit-2511_lightning-4step_api.json` | `POST /v1/images/qwen-image-edit-2511/edit-lightning-4step` |
+| 1～3 图满血版 | `qwen-image-edit-2511-multi_api.json` | `POST /v1/images/qwen-image-edit-2511/edit-multi` |
+| 1～3 图 Lightning 4 步 | `qwen-image-edit-2511-multi-lightning-4step_api.json` | `POST /v1/images/qwen-image-edit-2511/edit-multi-lightning-4step` |
+
+满血版默认使用 40 步、CFG 4，不加载 Lightning LoRA；输出尺寸跟随经过 `FluxKontextImageScale` 处理后的主图。可传入 `negative_prompt`、`steps`、`cfg` 和 `seed`。
+
+Lightning 版固定使用 4 步 LoRA；可传入 `width`、`height` 和 `seed`，默认尺寸为 `864x1536`。
+
+多图接口的 `images` 数组接受 1～3 张 Base64 图片，第一张是主图，其余为可选参考图。未提供的参考图节点会在提交 ComfyUI 前自动移除。下面是满血多图版调用示例：
+
+```bash
+./.venv/bin/python - <<'PY'
+import base64
+from pathlib import Path
+
+import requests
+
+
+def image_base64(path):
+    return base64.b64encode(Path(path).read_bytes()).decode()
+
+
+response = requests.post(
+    "http://127.0.0.1:8002/v1/images/qwen-image-edit-2511/edit-multi",
+    json={
+        "images": [
+            image_base64("input-1.png"),
+            image_base64("input-2.png"),
+            image_base64("input-3.png"),
+        ],
+        "prompt": "Use image 1 as the main scene, image 2 as the character reference, and image 3 as the clothing reference.",
+        "steps": 40,
+        "cfg": 4,
+    },
+    timeout=None,
+)
+response.raise_for_status()
+Path("qwen-image-edit-2511-multi.png").write_bytes(
+    base64.b64decode(response.json()["images"][0])
+)
+PY
+```
+
+将 URL 改为下面的地址即可调用多图 Lightning 4 步版：
+
+```text
+http://127.0.0.1:8002/v1/images/qwen-image-edit-2511/edit-multi-lightning-4step
+```
+
+### 直接调用 ComfyUI 三图工作流（Lightning 4 步，调试用）
 
 工作流文件：
 
@@ -178,7 +232,7 @@ models/vae/qwen_image_vae.safetensors
 models/loras/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors
 ```
 
-当前 `/v1/images/qwen-image-edit-2511/edit` 接口只接收单图，因此三图工作流需要先在 AutoDL 实例内直接调用 ComfyUI API。先把三张图片上传到 ComfyUI：
+如需绕过 Gateway 和 `comfyui_api` 调试原始工作流，可以在 AutoDL 实例内直接调用 ComfyUI API。先把三张图片上传到 ComfyUI：
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8188/upload/image \
@@ -265,8 +319,10 @@ Gateway 会将 `/v1/vlm/*` 转发到 VLM 服务，客户端仍只访问 `:8000`�
 |---|---|
 | 健康检查 | `GET /health` |
 | Qwen 文生图 | `POST /v1/images/qwen-image-2512/generate` |
-| Qwen 图片编辑 | `POST /v1/images/qwen-image-edit-2511/edit` |
-| Qwen 1～3 图 Lightning 4 步编辑 | `POST /v1/images/qwen-image-edit-2511/edit-multi` |
+| Qwen 单图满血编辑 | `POST /v1/images/qwen-image-edit-2511/edit` |
+| Qwen 单图 Lightning 4 步编辑 | `POST /v1/images/qwen-image-edit-2511/edit-lightning-4step` |
+| Qwen 1～3 图满血编辑 | `POST /v1/images/qwen-image-edit-2511/edit-multi` |
+| Qwen 1～3 图 Lightning 4 步编辑 | `POST /v1/images/qwen-image-edit-2511/edit-multi-lightning-4step` |
 | LTX 文/图生视频 | `POST /v1/videos/ltx-2.3/generate` |
 
 当前为了保持代码简单，请求会等待 workflow 完成，结果以 Base64 返回。如果后续需要高并发或大视频，再增加任务队列和文件 URL。
