@@ -12,7 +12,9 @@ from app.config import load_config
 from app.schemas import (
     LTXVideoRequest,
     QwenImageEditRequest,
+    QwenImageEditLightningRequest,
     QwenImageMultiEditRequest,
+    QwenImageMultiEditLightningRequest,
     QwenImageRequest,
 )
 
@@ -20,7 +22,12 @@ from app.schemas import (
 WORKFLOW_DIR = Path(__file__).parent / "workflows"
 CONFIG = load_config()["services"]["comfyui_api"]
 WORKFLOW_FILES = CONFIG["workflows"]
-MULTI_IMAGE_NODES = (
+FULL_MULTI_IMAGE_NODES = (
+    ("6", "image1"),
+    ("16", "image2"),
+    ("17", "image3"),
+)
+LIGHTNING_MULTI_IMAGE_NODES = (
     ("21", "image1"),
     ("23", "image2"),
     ("24", "image3"),
@@ -83,14 +90,50 @@ def output_values(files: list[dict], file_type: str) -> list[str]:
     return values
 
 
-def set_multi_image_inputs(workflow: dict, filenames: list[str]) -> None:
-    encoder_inputs = workflow["20"]["inputs"]
-    for index, (node_id, input_name) in enumerate(MULTI_IMAGE_NODES):
+def set_multi_image_inputs(
+    workflow: dict,
+    filenames: list[str],
+    image_nodes: tuple[tuple[str, str], ...],
+    encoder_nodes: tuple[str, ...],
+) -> None:
+    for index, (node_id, input_name) in enumerate(image_nodes):
         if index < len(filenames):
             workflow[node_id]["inputs"]["image"] = filenames[index]
         else:
-            encoder_inputs.pop(input_name, None)
+            for encoder_node in encoder_nodes:
+                workflow[encoder_node]["inputs"].pop(input_name, None)
             workflow.pop(node_id, None)
+
+
+def set_full_edit_parameters(
+    workflow: dict,
+    prompt: str,
+    negative_prompt: str,
+    steps: int,
+    cfg: float,
+    seed: int | None,
+) -> None:
+    workflow["8"]["inputs"]["prompt"] = prompt
+    workflow["9"]["inputs"]["prompt"] = negative_prompt
+    workflow["13"]["inputs"].update(
+        steps=steps,
+        cfg=cfg,
+        seed=seed if seed is not None else random.randrange(1, 2**63),
+    )
+
+
+def set_lightning_edit_parameters(
+    workflow: dict,
+    prompt: str,
+    width: int,
+    height: int,
+    seed: int | None,
+) -> None:
+    workflow["20"]["inputs"]["prompt"] = prompt
+    workflow["17"]["inputs"].update(width=width, height=height)
+    workflow["7"]["inputs"]["noise_seed"] = (
+        seed if seed is not None else random.randrange(1, 2**63)
+    )
 
 
 @app.get("/health")
@@ -122,16 +165,43 @@ async def edit_qwen_image(req: QwenImageEditRequest, request: Request):
     comfyui = client(request)
     filename = await comfyui.upload_image(req.image)
     workflow = load_workflow("qwen-image-edit-2511")
-    workflow["21"]["inputs"]["image"] = filename
-    workflow["20"]["inputs"]["prompt"] = req.prompt
-    workflow["17"]["inputs"].update(width=req.width, height=req.height)
-    workflow["11"]["inputs"]["steps"] = req.steps
-    workflow["7"]["inputs"]["noise_seed"] = (
-        req.seed if req.seed is not None else random.randrange(1, 2**63)
+    workflow["6"]["inputs"]["image"] = filename
+    set_full_edit_parameters(
+        workflow,
+        req.prompt,
+        req.negative_prompt,
+        req.steps,
+        req.cfg,
+        req.seed,
     )
     files = await comfyui.run_workflow(workflow)
     return {
         "model": "qwen-image-edit-2511",
+        "profile": "full",
+        "images": output_values(files, "image"),
+    }
+
+
+@app.post("/v1/images/qwen-image-edit-2511/edit-lightning-4step")
+async def edit_qwen_image_lightning(
+    req: QwenImageEditLightningRequest,
+    request: Request,
+):
+    comfyui = client(request)
+    filename = await comfyui.upload_image(req.image)
+    workflow = load_workflow("qwen-image-edit-2511-lightning-4step")
+    workflow["21"]["inputs"]["image"] = filename
+    set_lightning_edit_parameters(
+        workflow,
+        req.prompt,
+        req.width,
+        req.height,
+        req.seed,
+    )
+    files = await comfyui.run_workflow(workflow)
+    return {
+        "model": "qwen-image-edit-2511",
+        "profile": "lightning-4step",
         "images": output_values(files, "image"),
     }
 
@@ -143,16 +213,55 @@ async def edit_qwen_image_multi(
 ):
     comfyui = client(request)
     filenames = [await comfyui.upload_image(image) for image in req.images]
-    workflow = load_workflow("qwen-image-edit-2511-multi-lightning-4step")
-    set_multi_image_inputs(workflow, filenames)
-    workflow["20"]["inputs"]["prompt"] = req.prompt
-    workflow["17"]["inputs"].update(width=req.width, height=req.height)
-    workflow["7"]["inputs"]["noise_seed"] = (
-        req.seed if req.seed is not None else random.randrange(1, 2**63)
+    workflow = load_workflow("qwen-image-edit-2511-multi")
+    set_multi_image_inputs(
+        workflow,
+        filenames,
+        FULL_MULTI_IMAGE_NODES,
+        ("8", "9"),
+    )
+    set_full_edit_parameters(
+        workflow,
+        req.prompt,
+        req.negative_prompt,
+        req.steps,
+        req.cfg,
+        req.seed,
     )
     files = await comfyui.run_workflow(workflow)
     return {
-        "model": "qwen-image-edit-2511-multi-lightning-4step",
+        "model": "qwen-image-edit-2511",
+        "profile": "full-multi",
+        "input_count": len(req.images),
+        "images": output_values(files, "image"),
+    }
+
+
+@app.post("/v1/images/qwen-image-edit-2511/edit-multi-lightning-4step")
+async def edit_qwen_image_multi_lightning(
+    req: QwenImageMultiEditLightningRequest,
+    request: Request,
+):
+    comfyui = client(request)
+    filenames = [await comfyui.upload_image(image) for image in req.images]
+    workflow = load_workflow("qwen-image-edit-2511-multi-lightning-4step")
+    set_multi_image_inputs(
+        workflow,
+        filenames,
+        LIGHTNING_MULTI_IMAGE_NODES,
+        ("20",),
+    )
+    set_lightning_edit_parameters(
+        workflow,
+        req.prompt,
+        req.width,
+        req.height,
+        req.seed,
+    )
+    files = await comfyui.run_workflow(workflow)
+    return {
+        "model": "qwen-image-edit-2511",
+        "profile": "lightning-4step-multi",
         "input_count": len(req.images),
         "images": output_values(files, "image"),
     }

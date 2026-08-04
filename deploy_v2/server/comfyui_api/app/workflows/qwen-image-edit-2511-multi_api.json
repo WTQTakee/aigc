@@ -1,0 +1,185 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "qwen_image_edit_2511_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Qwen Image Edit 2511 BF16"
+    }
+  },
+  "2": {
+    "inputs": {
+      "shift": 3.1,
+      "model": ["1", 0]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "Model Sampling AuraFlow"
+    }
+  },
+  "3": {
+    "inputs": {
+      "strength": 1,
+      "pre_cfg": false,
+      "model": ["2", 0]
+    },
+    "class_type": "CFGNorm",
+    "_meta": {
+      "title": "CFG Norm"
+    }
+  },
+  "4": {
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load Qwen 2.5 VL"
+    }
+  },
+  "5": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load Qwen Image VAE"
+    }
+  },
+  "6": {
+    "inputs": {
+      "image": "input-1.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Image 1 - Main Image"
+    }
+  },
+  "7": {
+    "inputs": {
+      "image": ["6", 0]
+    },
+    "class_type": "FluxKontextImageScale",
+    "_meta": {
+      "title": "Scale Main Image"
+    }
+  },
+  "8": {
+    "inputs": {
+      "prompt": "Use image 1 as the main image. Use images 2 and 3 as additional references. Apply the requested edit while preserving identity, composition, and important visual details.",
+      "clip": ["4", 0],
+      "vae": ["5", 0],
+      "image1": ["7", 0],
+      "image2": ["16", 0],
+      "image3": ["17", 0]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "Qwen Image Edit Plus - Positive"
+    }
+  },
+  "9": {
+    "inputs": {
+      "prompt": "",
+      "clip": ["4", 0],
+      "vae": ["5", 0],
+      "image1": ["7", 0],
+      "image2": ["16", 0],
+      "image3": ["17", 0]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "Qwen Image Edit Plus - Negative"
+    }
+  },
+  "10": {
+    "inputs": {
+      "conditioning": ["8", 0],
+      "reference_latents_method": "index_timestep_zero"
+    },
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "_meta": {
+      "title": "Positive Reference Latents Method"
+    }
+  },
+  "11": {
+    "inputs": {
+      "conditioning": ["9", 0],
+      "reference_latents_method": "index_timestep_zero"
+    },
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "_meta": {
+      "title": "Negative Reference Latents Method"
+    }
+  },
+  "12": {
+    "inputs": {
+      "pixels": ["7", 0],
+      "vae": ["5", 0]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "Encode Main Image"
+    }
+  },
+  "13": {
+    "inputs": {
+      "seed": 937026325566296,
+      "steps": 40,
+      "cfg": 4,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": ["3", 0],
+      "positive": ["10", 0],
+      "negative": ["11", 0],
+      "latent_image": ["12", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler - Full Quality"
+    }
+  },
+  "14": {
+    "inputs": {
+      "samples": ["13", 0],
+      "vae": ["5", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "15": {
+    "inputs": {
+      "filename_prefix": "Qwen-Image-Edit-2511-Full-Multi",
+      "images": ["14", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "16": {
+    "inputs": {
+      "image": "input-2.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Image 2 - Reference"
+    }
+  },
+  "17": {
+    "inputs": {
+      "image": "input-3.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Image 3 - Reference"
+    }
+  }
+}

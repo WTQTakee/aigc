@@ -17,13 +17,30 @@ class QwenImageRequest(BaseModel):
 class QwenImageEditRequest(BaseModel):
     image: str
     prompt: str
+    negative_prompt: str = ""
+    steps: int = Field(default=40, gt=0)
+    cfg: float = Field(default=4.0, ge=0)
+    seed: int | None = None
+
+
+class QwenImageEditLightningRequest(BaseModel):
+    image: str
+    prompt: str
     width: int = Field(default=864, gt=0)
     height: int = Field(default=1536, gt=0)
-    steps: int = Field(default=4, gt=0)
     seed: int | None = None
 
 
 class QwenImageMultiEditRequest(BaseModel):
+    images: list[str] = Field(min_length=1, max_length=3)
+    prompt: str
+    negative_prompt: str = ""
+    steps: int = Field(default=40, gt=0)
+    cfg: float = Field(default=4.0, ge=0)
+    seed: int | None = None
+
+
+class QwenImageMultiEditLightningRequest(BaseModel):
     images: list[str] = Field(min_length=1, max_length=3)
     prompt: str
     width: int = Field(default=864, gt=0)
