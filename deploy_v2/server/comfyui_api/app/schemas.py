@@ -23,6 +23,14 @@ class QwenImageEditRequest(BaseModel):
     seed: int | None = None
 
 
+class QwenImageMultiEditRequest(BaseModel):
+    images: list[str] = Field(min_length=1, max_length=3)
+    prompt: str
+    width: int = Field(default=864, gt=0)
+    height: int = Field(default=1536, gt=0)
+    seed: int | None = None
+
+
 class LTXVideoRequest(BaseModel):
     prompt: str
     negative_prompt: str = (

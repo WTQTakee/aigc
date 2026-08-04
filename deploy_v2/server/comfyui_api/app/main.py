@@ -9,12 +9,22 @@ from fastapi.responses import JSONResponse
 
 from app.comfyui import ComfyUIClient
 from app.config import load_config
-from app.schemas import LTXVideoRequest, QwenImageEditRequest, QwenImageRequest
+from app.schemas import (
+    LTXVideoRequest,
+    QwenImageEditRequest,
+    QwenImageMultiEditRequest,
+    QwenImageRequest,
+)
 
 
 WORKFLOW_DIR = Path(__file__).parent / "workflows"
 CONFIG = load_config()["services"]["comfyui_api"]
 WORKFLOW_FILES = CONFIG["workflows"]
+MULTI_IMAGE_NODES = (
+    ("21", "image1"),
+    ("23", "image2"),
+    ("24", "image3"),
+)
 
 
 def load_workflow(name: str) -> dict:
@@ -73,6 +83,16 @@ def output_values(files: list[dict], file_type: str) -> list[str]:
     return values
 
 
+def set_multi_image_inputs(workflow: dict, filenames: list[str]) -> None:
+    encoder_inputs = workflow["20"]["inputs"]
+    for index, (node_id, input_name) in enumerate(MULTI_IMAGE_NODES):
+        if index < len(filenames):
+            workflow[node_id]["inputs"]["image"] = filenames[index]
+        else:
+            encoder_inputs.pop(input_name, None)
+            workflow.pop(node_id, None)
+
+
 @app.get("/health")
 async def health(request: Request):
     available = await client(request).health()
@@ -112,6 +132,28 @@ async def edit_qwen_image(req: QwenImageEditRequest, request: Request):
     files = await comfyui.run_workflow(workflow)
     return {
         "model": "qwen-image-edit-2511",
+        "images": output_values(files, "image"),
+    }
+
+
+@app.post("/v1/images/qwen-image-edit-2511/edit-multi")
+async def edit_qwen_image_multi(
+    req: QwenImageMultiEditRequest,
+    request: Request,
+):
+    comfyui = client(request)
+    filenames = [await comfyui.upload_image(image) for image in req.images]
+    workflow = load_workflow("qwen-image-edit-2511-multi-lightning-4step")
+    set_multi_image_inputs(workflow, filenames)
+    workflow["20"]["inputs"]["prompt"] = req.prompt
+    workflow["17"]["inputs"].update(width=req.width, height=req.height)
+    workflow["7"]["inputs"]["noise_seed"] = (
+        req.seed if req.seed is not None else random.randrange(1, 2**63)
+    )
+    files = await comfyui.run_workflow(workflow)
+    return {
+        "model": "qwen-image-edit-2511-multi-lightning-4step",
+        "input_count": len(req.images),
         "images": output_values(files, "image"),
     }
 

@@ -266,6 +266,7 @@ Gateway 会将 `/v1/vlm/*` 转发到 VLM 服务，客户端仍只访问 `:8000`�
 | 健康检查 | `GET /health` |
 | Qwen 文生图 | `POST /v1/images/qwen-image-2512/generate` |
 | Qwen 图片编辑 | `POST /v1/images/qwen-image-edit-2511/edit` |
+| Qwen 1～3 图 Lightning 4 步编辑 | `POST /v1/images/qwen-image-edit-2511/edit-multi` |
 | LTX 文/图生视频 | `POST /v1/videos/ltx-2.3/generate` |
 
 当前为了保持代码简单，请求会等待 workflow 完成，结果以 Base64 返回。如果后续需要高并发或大视频，再增加任务队列和文件 URL。
