@@ -140,6 +140,7 @@ ssh -N -L 8002:127.0.0.1:8000 \
 文生图：
 
 ```bash
+cd aigc/deploy_v2/client
 ./.venv/bin/python example.py text-to-image \
   --base-url http://127.0.0.1:8002 \
   --prompt "A cinematic portrait in Tokyo at night"
