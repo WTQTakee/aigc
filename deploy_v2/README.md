@@ -6,14 +6,16 @@
 
 - Qwen-Image-2512 文生图
 - Qwen-Image-Edit-2511 图片编辑
-- LTX-2.3 文生视频和图生视频
+- LTX-2.3 官方 ComfyUI 视频、音频和 IC-LoRA 工作流
+- MiniMax H3 官方 REF2VA BF16 满血版与量化版参考生视频
 
 ## 架构
 
 ```text
 客户端
    └── Gateway :8000
-          ├── /v1/images/* ──┐
+          ├── /v1/audio/* ───┐
+          ├── /v1/images/* ───┤
           └── /v1/videos/* ──┴──> ComfyUI API :8100 ──> ComfyUI :8188
 ```
 
@@ -46,6 +48,7 @@ gateway:
   port: 8000
   request_timeout: 3600
   routes:
+    /v1/audio: comfyui_api
     /v1/images: comfyui_api
     /v1/videos: comfyui_api
 
@@ -56,7 +59,7 @@ services:
     port: 8100
     comfyui_url: http://127.0.0.1:8188
     poll_interval: 1
-    workflow_timeout: 1800
+    workflow_timeout: 3600
 ```
 
 `gateway.host` 设为 `0.0.0.0` 供外部访问；内部模型服务保持 `127.0.0.1`，不直接暴露公网。所有服务统一读取这一份 `config.yaml`。
@@ -107,6 +110,80 @@ STARTUP_TIMEOUT=300 \
 ```
 
 对公网开放时，建议在 Gateway 前放置 Nginx/Caddy，添加 HTTPS 和鉴权。
+
+### LTX-2.3 官方工作流模型
+
+原有 `ltx-2.3-t2v-i2v-two-stage-distilled_api.json` 已经使用的基础 checkpoint、distilled LoRA、x2 latent upscaler 和 Gemma 文本编码器不会重复下载。先在 Hugging Face 接受 Lightricks 模型许可并登录，然后执行：
+
+```bash
+python3 -m pip install -U huggingface_hub
+hf auth login
+
+cd /root/autodl-tmp/aigc/deploy_v2/server
+COMFYUI_DIR=/root/autodl-tmp/ComfyUI \
+  ./download_ltx_2_3_official_models.sh
+```
+
+脚本会下载 8 个新增 IC-LoRA 到 `ComfyUI/models/loras/`，并把 Union Control 的 Video Depth Anything 和 DWPose 权重放到对应的模型目录。
+
+这些官方工作流还要求较新的 ComfyUI，以及下列自定义节点：
+
+```bash
+cd /root/autodl-tmp/ComfyUI/custom_nodes
+git clone https://github.com/Lightricks/ComfyUI-LTXVideo.git
+git clone https://github.com/kijai/ComfyUI-KJNodes.git
+git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git
+git clone https://github.com/yuvraj108c/ComfyUI-Video-Depth-Anything.git
+git clone https://github.com/ClownsharkBatwing/RES4LYF.git
+git clone https://github.com/cubiq/ComfyUI_essentials.git
+```
+
+已存在的目录不要重复 `git clone`，进入目录执行 `git pull` 即可。安装或更新后，按各仓库的 `requirements.txt` 安装依赖并重启 ComfyUI。
+
+### MiniMax H3 REF2VA 官方工作流
+
+服务内置两个 API 格式工作流，推理拓扑来自 ComfyUI 官方
+`video_minimax_h3_r2v.json`，都使用原生 `MiniMaxH3ReferenceToVideo`、
+`res_multistep`、视频/音频双 VAE 解码和原生双声道输出。两者默认 20 步，
+不加载 Turbo LoRA；区别仅在模型精度：
+
+| 模式 | API JSON | Diffusion model | Text encoder |
+|---|---|---|---|
+| BF16 满血版 | `minimax-h3-ref2va-bf16_api.json` | `minimax_h3_ref2va_bf16.safetensors` | `qwen3vl_32b_minimax_h3_bf16.safetensors` |
+| 官方量化版 | `minimax-h3-ref2va-quantized_api.json` | `minimax_h3_ref2va_pruned_int8_convrot.safetensors` | `qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors` |
+
+二者共用：
+
+```text
+models/vae/minimax_h3_video_vae_fp16.safetensors
+models/vae/minimax_h3_audio_vae_fp32.safetensors
+```
+
+如果模型独立存放在 `/root/autodl-tmp/models`，请确认 ComfyUI 的
+`extra_model_paths.yaml` 包含：
+
+```yaml
+aigc_models:
+  base_path: /root/autodl-tmp/models
+  diffusion_models: diffusion_models
+  text_encoders: text_encoders
+  vae: vae
+  loras: loras
+```
+
+MiniMax H3 是近期加入的原生节点，部署前需要把 ComfyUI 更新到包含
+`MiniMaxH3ReferenceToVideo` 的版本并重新安装其 `requirements.txt`：
+
+```bash
+cd /root/autodl-tmp/ComfyUI
+git pull
+./.venv/bin/pip install -r requirements.txt
+```
+
+接口当前接收 1～9 张 Base64 参考图片。图片按照数组顺序映射为
+`<Picture 1>`～`<Picture 9>`；提示词必须使用完全相同的标签。输出固定为
+24fps，并同时生成画面和原生音频。`duration` 接受 5～15 秒，服务会向上
+对齐到 H3 的 `17k+5` 合法帧数；例如 5 秒对应 124 帧。
 
 ## 客户端调用
 
@@ -293,6 +370,74 @@ jq --arg prompt \
   --prompt "The camera slowly pushes in"
 ```
 
+### MiniMax H3 REF2VA API
+
+BF16 满血版：
+
+```bash
+cd aigc/deploy_v2/client
+./.venv/bin/python - <<'PY'
+import base64
+from pathlib import Path
+
+import requests
+
+
+def image_base64(path):
+    return base64.b64encode(Path(path).read_bytes()).decode()
+
+
+response = requests.post(
+    "http://127.0.0.1:8002/v1/videos/minimax_h3_ref2va_bf16",
+    json={
+        "images": [
+            image_base64("character.png"),
+            image_base64("style.png"),
+        ],
+        "prompt": (
+            "Use <Picture 1> as the character identity and <Picture 2> as the "
+            "visual style. The character walks through a rainy neon street. "
+            "Camera slowly pushes in. Audio: rain, footsteps and distant traffic."
+        ),
+        "width": 1344,
+        "height": 768,
+        "duration": 5,
+        "steps": 20,
+        "scheduler": "simple",
+        "ref_image_size": "match",
+        "seed": 42,
+    },
+    timeout=None,
+)
+response.raise_for_status()
+result = response.json()
+Path("minimax-h3-ref2va-bf16.mp4").write_bytes(
+    base64.b64decode(result["videos"][0])
+)
+print({key: value for key, value in result.items() if key != "videos"})
+PY
+```
+
+量化版请求体完全一致，只需更换接口：
+
+```text
+POST /v1/videos/minimax_h3_ref2va_quantized
+```
+
+可调参数：
+
+| 字段 | 默认值 | 约束/说明 |
+|---|---:|---|
+| `images` | 必填 | 1～9 张 Base64 图片，顺序对应 `<Picture N>` |
+| `prompt` | 必填 | 必须准确引用所需的 `<Picture N>` 标签 |
+| `width` | `1344` | 32～1344，且必须为 32 的倍数 |
+| `height` | `768` | 32～1344，且必须为 32 的倍数 |
+| `duration` | `5` | 5～15 秒，自动对齐合法帧数 |
+| `steps` | `20` | 官方完整采样默认 20 步 |
+| `scheduler` | `simple` | `simple`、`normal` 或 `beta` |
+| `ref_image_size` | `match` | `match` 较快；`max` 保留更高参考图细节但更慢 |
+| `seed` | 随机 | 可选非负整数；响应会返回实际 seed |
+
 ## 新增模型服务
 
 例如新增 `vlm_api`：
@@ -325,6 +470,19 @@ Gateway 会将 `/v1/vlm/*` 转发到 VLM 服务，客户端仍只访问 `:8000`�
 | Qwen 单图 Lightning 4 步编辑 | `POST /v1/images/qwen-image-edit-2511/edit-lightning-4step` |
 | Qwen 1～3 图满血编辑 | `POST /v1/images/qwen-image-edit-2511/edit-multi` |
 | Qwen 1～3 图 Lightning 4 步编辑 | `POST /v1/images/qwen-image-edit-2511/edit-multi-lightning-4step` |
-| LTX 文/图生视频 | `POST /v1/videos/ltx-2.3/generate` |
+| LTX 文/图生视频 | `POST /v1/videos/ltx_2d3_t2v_i2v_two_stage_distilled` |
+| LTX 文生音频 | `POST /v1/audio/ltx_2d3_t2a_single_stage_distilled` |
+| LTX 单阶段文/图生视频（distilled + full） | `POST /v1/videos/ltx_2d3_t2v_i2v_single_stage_distilled_full` |
+| LTX HDR | `POST /v1/videos/ltx_2d3_iclora_hdr_distilled` |
+| LTX Ingredients | `POST /v1/videos/ltx_2d3_iclora_ingredients_single_stage_distilled` |
+| LTX Inpaint | `POST /v1/videos/ltx_2d3_iclora_inpaint_two_stage_distilled` |
+| LTX LipDub / DubIt | `POST /v1/videos/ltx_2d3_iclora_lipdub_two_stage_distilled` |
+| LTX Motion Track | `POST /v1/videos/ltx_2d3_iclora_motion_track_distilled` |
+| LTX Outpaint | `POST /v1/videos/ltx_2d3_iclora_outpaint_two_stage_distilled` |
+| LTX Pixel x4 Upscale | `POST /v1/videos/ltx_2d3_iclora_pixel_spatial_upscaler_distilled` |
+| LTX Union Control | `POST /v1/videos/ltx_2d3_iclora_union_control_distilled` |
+| LTX V2V IC-LoRA | `POST /v1/videos/ltx_2d3_v2v_iclora_single_stage_distilled` |
+| MiniMax H3 REF2VA BF16 满血版 | `POST /v1/videos/minimax_h3_ref2va_bf16` |
+| MiniMax H3 REF2VA 官方量化版 | `POST /v1/videos/minimax_h3_ref2va_quantized` |
 
 当前为了保持代码简单，请求会等待 workflow 完成，结果以 Base64 返回。如果后续需要高并发或大视频，再增加任务队列和文件 URL。

@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import binascii
+import mimetypes
 import time
 import uuid
 from pathlib import Path
@@ -10,6 +11,7 @@ import httpx
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".mkv", ".avi", ".gif"}
+AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".m4a", ".aac", ".ogg"}
 
 
 class ComfyUIClient:
@@ -35,18 +37,36 @@ class ComfyUIClient:
             return False
 
     async def upload_image(self, image_base64: str) -> str:
-        if "," in image_base64:
-            image_base64 = image_base64.split(",", 1)[1]
+        return await self.upload_media(image_base64, ".png", "image/png")
+
+    async def upload_video(self, video_base64: str) -> str:
+        return await self.upload_media(video_base64, ".mp4", "video/mp4")
+
+    async def upload_media(
+        self,
+        encoded: str,
+        default_suffix: str,
+        default_mime_type: str,
+    ) -> str:
+        mime_type = default_mime_type
+        if encoded.startswith("data:") and "," in encoded:
+            header, encoded = encoded.split(",", 1)
+            declared_type = header[5:].split(";", 1)[0]
+            if declared_type:
+                mime_type = declared_type
 
         try:
-            image_bytes = base64.b64decode(image_base64, validate=True)
+            media_bytes = base64.b64decode(encoded, validate=True)
         except (binascii.Error, ValueError) as exc:
-            raise ValueError("image 不是有效的 Base64 数据") from exc
+            raise ValueError("媒体内容不是有效的 Base64 数据") from exc
 
-        filename = f"{uuid.uuid4().hex}.png"
+        suffix = mimetypes.guess_extension(mime_type) or default_suffix
+        if suffix == ".jpe":
+            suffix = ".jpg"
+        filename = f"{uuid.uuid4().hex}{suffix}"
         response = await self.http.post(
             f"{self.base_url}/upload/image",
-            files={"image": (filename, image_bytes, "image/png")},
+            files={"image": (filename, media_bytes, mime_type)},
             data={"overwrite": "true"},
         )
         response.raise_for_status()
@@ -112,8 +132,12 @@ def _file_type(filename: str, output_key: str) -> str:
         return "image"
     if extension in VIDEO_EXTENSIONS:
         return "video"
+    if extension in AUDIO_EXTENSIONS:
+        return "audio"
     if any(word in output_key.lower() for word in ("video", "gif")):
         return "video"
     if "image" in output_key.lower():
         return "image"
+    if "audio" in output_key.lower():
+        return "audio"
     return "file"

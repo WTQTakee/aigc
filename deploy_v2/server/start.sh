@@ -9,6 +9,10 @@ RUNTIME_DIR="${AIGC_RUNTIME_DIR:-${SCRIPT_DIR}/.runtime}"
 EXTRA_MODEL_PATHS_CONFIG="${EXTRA_MODEL_PATHS_CONFIG:-${COMFYUI_DIR}/extra_model_paths.yaml}"
 COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 STARTUP_TIMEOUT="${STARTUP_TIMEOUT:-180}"
+COMFYUI_FILE_STORAGE_ROOT="${COMFYUI_FILE_STORAGE_ROOT:-/root/autodl-fs}"
+COMFYUI_OUTPUT_DIR="${COMFYUI_OUTPUT_DIR:-${COMFYUI_FILE_STORAGE_ROOT}/comfyui/output}"
+COMFYUI_INPUT_DIR="${COMFYUI_INPUT_DIR:-${COMFYUI_FILE_STORAGE_ROOT}/comfyui/input}"
+COMFYUI_TEMP_DIR="${COMFYUI_TEMP_DIR:-/root/autodl-tmp/comfyui_temp}"
 
 COMFYUI_API_DIR="${SCRIPT_DIR}/comfyui_api"
 GATEWAY_DIR="${SCRIPT_DIR}/gateway"
@@ -31,6 +35,13 @@ require_file() {
 
 require_dir() {
   [[ -d "$1" ]] || fail "找不到目录: $1"
+}
+
+require_mount() {
+  local path="$1"
+  require_dir "$path"
+  "$PYTHON_BIN" -c 'import os, sys; raise SystemExit(0 if os.path.ismount(sys.argv[1]) else 1)' "$path" \
+    || fail "目录不是独立挂载点: ${path}。请先在 AutoDL 初始化文件存储并重启实例"
 }
 
 check_python() {
@@ -177,8 +188,14 @@ main() {
   require_file "$EXTRA_MODEL_PATHS_CONFIG"
   require_file "$CONFIG_PATH"
   [[ -x "${COMFYUI_DIR}/.venv/bin/python" ]] || fail "ComfyUI 虚拟环境不存在: ${COMFYUI_DIR}/.venv"
+  require_mount "$COMFYUI_FILE_STORAGE_ROOT"
 
-  mkdir -p "$PID_DIR" "$LOG_DIR"
+  mkdir -p \
+    "$PID_DIR" \
+    "$LOG_DIR" \
+    "$COMFYUI_OUTPUT_DIR" \
+    "$COMFYUI_INPUT_DIR" \
+    "$COMFYUI_TEMP_DIR"
   ensure_venv "$COMFYUI_API_DIR"
   ensure_venv "$GATEWAY_DIR"
 
@@ -208,7 +225,10 @@ with open(sys.argv[1], encoding="utf-8") as file:
     "${COMFYUI_DIR}/.venv/bin/python" main.py \
       --listen 127.0.0.1 \
       --port "$COMFYUI_PORT" \
-      --extra-model-paths-config "$EXTRA_MODEL_PATHS_CONFIG"
+      --extra-model-paths-config "$EXTRA_MODEL_PATHS_CONFIG" \
+      --output-directory "$COMFYUI_OUTPUT_DIR" \
+      --input-directory "$COMFYUI_INPUT_DIR" \
+      --temp-directory "$COMFYUI_TEMP_DIR"
 
   start_service \
     "comfyui-api" \

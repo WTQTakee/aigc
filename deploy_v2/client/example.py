@@ -52,7 +52,7 @@ def main() -> None:
                 parser.error("image-to-video 需要 --input")
             payload["image"] = image_base64(args.input)
         request_and_save(
-            f"{base_url}/v1/videos/ltx-2.3/generate",
+            f"{base_url}/v1/videos/ltx_2d3_t2v_i2v_two_stage_distilled",
             payload,
             "videos",
             args.output or f"ltx-{args.command}.mp4",
