@@ -78,7 +78,7 @@ chmod +x start.sh
 
 `start.sh` 会自动完成：
 
-1. 检查 Python 版本、ComfyUI 目录、ComfyUI venv 和 `extra_model_paths.yaml`。
+1. 检查 Python 版本、ComfyUI 目录、ComfyUI venv、存储目录和 `extra_model_paths.yaml`。
 2. 为 ComfyUI API 和 Gateway 创建独立的 `.venv`。
 3. 仅在 `requirements.txt` 变化时重新安装依赖。
 4. 后台依次启动 ComfyUI `:8188`、ComfyUI API `:8100` 和 Gateway `:8000`。
@@ -108,6 +108,16 @@ OMP_NUM_THREADS=8 \
 STARTUP_TIMEOUT=300 \
 ./start.sh
 ```
+
+默认不依赖 `/root/autodl-fs`，输入、输出和临时文件分别写入：
+
+```text
+/root/autodl-tmp/comfyui/input
+/root/autodl-tmp/comfyui/output
+/root/autodl-tmp/comfyui/temp
+```
+
+如需切换到 AutoDL 文件存储，再通过 `COMFYUI_FILE_STORAGE_ROOT` 覆盖。
 
 对公网开放时，建议在 Gateway 前放置 Nginx/Caddy，添加 HTTPS 和鉴权。
 
