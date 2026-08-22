@@ -1,5 +1,7 @@
 **/.venv/
 **/__pycache__/
+.DS_Store
 *.py[cod]
+server/.runtime/
 client/*.png
 client/*.mp4
