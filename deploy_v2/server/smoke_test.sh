@@ -39,7 +39,6 @@ payload = json.dumps(
         "prompt": prompt,
         "width": 512,
         "height": 512,
-        "steps": 4,
         "seed": 1,
     }
 ).encode()

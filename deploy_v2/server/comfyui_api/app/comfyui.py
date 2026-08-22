@@ -42,6 +42,9 @@ class ComfyUIClient:
     async def upload_video(self, video_base64: str) -> str:
         return await self.upload_media(video_base64, ".mp4", "video/mp4")
 
+    async def upload_audio(self, audio_base64: str) -> str:
+        return await self.upload_media(audio_base64, ".wav", "audio/wav")
+
     async def upload_media(
         self,
         encoded: str,

@@ -61,19 +61,25 @@
   },
   "7": {
     "inputs": {
-      "image": ["6", 0]
+      "image": ["6", 0],
+      "upscale_method": "lanczos",
+      "width": 1024,
+      "height": 1024,
+      "crop": "center"
     },
-    "class_type": "FluxKontextImageScale",
+    "class_type": "ImageScale",
     "_meta": {
-      "title": "Scale Main Image"
+      "title": "Scale Main Image to Target Size"
     }
   },
   "8": {
     "inputs": {
-      "prompt": "Apply the requested edit while preserving identity, composition, and important visual details.",
+      "prompt": "Use image 1 as the main image. Use images 2 and 3 as additional references. Apply the requested edit while preserving identity, composition, and important visual details.",
       "clip": ["4", 0],
       "vae": ["5", 0],
-      "image1": ["7", 0]
+      "image1": ["7", 0],
+      "image2": ["16", 0],
+      "image3": ["17", 0]
     },
     "class_type": "TextEncodeQwenImageEditPlus",
     "_meta": {
@@ -85,7 +91,9 @@
       "prompt": "",
       "clip": ["4", 0],
       "vae": ["5", 0],
-      "image1": ["7", 0]
+      "image1": ["7", 0],
+      "image2": ["16", 0],
+      "image3": ["17", 0]
     },
     "class_type": "TextEncodeQwenImageEditPlus",
     "_meta": {
@@ -152,12 +160,30 @@
   },
   "15": {
     "inputs": {
-      "filename_prefix": "Qwen-Image-Edit-2511-Full-Single",
+      "filename_prefix": "Qwen-Image-Edit-2511",
       "images": ["14", 0]
     },
     "class_type": "SaveImage",
     "_meta": {
       "title": "Save Image"
+    }
+  },
+  "16": {
+    "inputs": {
+      "image": "input-2.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Image 2 - Reference"
+    }
+  },
+  "17": {
+    "inputs": {
+      "image": "input-3.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Image 3 - Reference"
     }
   }
 }

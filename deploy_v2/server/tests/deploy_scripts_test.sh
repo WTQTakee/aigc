@@ -6,9 +6,8 @@ SERVER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIR="$(mktemp -d)"
 RUNTIME_DIR="${TEST_DIR}/runtime"
 PID_DIR="${RUNTIME_DIR}/pids"
-STOP_SERVER_DIR="${TEST_DIR}/server"
 TEST_COMFYUI_DIR="${TEST_DIR}/ComfyUI"
-STOP_SCRIPT="${STOP_SERVER_DIR}/stop.sh"
+STOP_SCRIPT="${SERVER_DIR}/stop.sh"
 MOCK_PORT_FILE="${TEST_DIR}/mock-port"
 MOCK_SERVER="${TEST_DIR}/mock-server.py"
 MOCK_PID=""
@@ -57,14 +56,12 @@ spawn_named_sleep() {
 test_stop_script() {
   local name pid executable
   mkdir -p "$PID_DIR"
-  mkdir -p "$STOP_SERVER_DIR"
-  ln -s "$SERVER_DIR/stop.sh" "$STOP_SCRIPT"
 
   for name in comfyui comfyui-api gateway; do
     case "$name" in
       comfyui) executable="${TEST_COMFYUI_DIR}/.venv/bin/python" ;;
-      comfyui-api) executable="${STOP_SERVER_DIR}/comfyui_api/.venv/bin/python" ;;
-      gateway) executable="${STOP_SERVER_DIR}/gateway/.venv/bin/python" ;;
+      comfyui-api) executable="${SERVER_DIR}/comfyui_api/.venv/bin/python" ;;
+      gateway) executable="${SERVER_DIR}/gateway/.venv/bin/python" ;;
     esac
     spawn_named_sleep "$executable"
     pid="$SPAWNED_PID"

@@ -1,12 +1,12 @@
 # AIGC 部署 v2
 
-本目录提供一个统一的 AIGC HTTP 服务：客户端只访问 Gateway，Gateway 再把请求转发给 ComfyUI API，最后由 ComfyUI 执行工作流。
+个人单机使用的 FastAPI + ComfyUI 服务，提供 MiniMax H3 Ref2VA、Qwen Image 2512 和 Qwen Image Edit 2511 接口。
 
 ```text
 客户端 → Gateway :8000 → ComfyUI API :8100 → ComfyUI :8188
 ```
 
-适用环境：AutoDL Ubuntu、NVIDIA GPU、Python 3.10 及以上。本文默认目录为：
+## 部署目录
 
 ```text
 /root/autodl-tmp/aigc/deploy_v2
@@ -14,15 +14,13 @@
 /root/autodl-tmp/models
 ```
 
-## 1. 第一次部署
+需要 AutoDL Ubuntu、NVIDIA GPU、Python 3.10+ 和较新的 ComfyUI。MiniMax H3 所需的 `MiniMaxH3ReferenceToVideo`、`LoadVideo` 和 `GetVideoComponents` 均为 ComfyUI 核心节点。
 
-### 1.1 安装基础环境
-
-建议直接选择 AutoDL 的 PyTorch 镜像。确认部署代码已经放在 `/root/autodl-tmp/aigc/deploy_v2`，然后执行：
+## 准备 ComfyUI
 
 ```bash
 apt-get update
-apt-get install -y git curl python3-venv
+apt-get install -y git curl ffmpeg python3-venv
 
 cd /root/autodl-tmp
 git clone https://github.com/comfyanonymous/ComfyUI.git
@@ -32,245 +30,152 @@ python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 ```
 
-如果 ComfyUI 已存在，只需更新依赖：
+如果已安装 ComfyUI，请先执行 `git pull` 并更新 requirements。
 
-```bash
-cd /root/autodl-tmp/ComfyUI
-git pull
-./.venv/bin/pip install -r requirements.txt
-```
-
-### 1.2 安装 ComfyUI 自定义节点
-
-LTX 工作流需要以下节点。只在第一次部署时执行：
-
-```bash
-cd /root/autodl-tmp/ComfyUI/custom_nodes
-git clone https://github.com/Lightricks/ComfyUI-LTXVideo.git
-git clone https://github.com/kijai/ComfyUI-KJNodes.git
-git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git
-git clone https://github.com/yuvraj108c/ComfyUI-Video-Depth-Anything.git
-git clone https://github.com/ClownsharkBatwing/RES4LYF.git
-git clone https://github.com/cubiq/ComfyUI_essentials.git
-```
-
-安装节点依赖：
-
-```bash
-cd /root/autodl-tmp/ComfyUI/custom_nodes
-for node in ComfyUI-LTXVideo ComfyUI-KJNodes comfyui_controlnet_aux ComfyUI-Video-Depth-Anything RES4LYF ComfyUI_essentials; do
-  test ! -f "$node/requirements.txt" || ../.venv/bin/pip install -r "$node/requirements.txt"
-done
-```
-
-如果暂时只使用 Qwen 文生图，可以先跳过本步骤。
-
-### 1.3 准备模型
-
-模型可以放在 ComfyUI 默认的 `models/` 下，也可以统一放在 `/root/autodl-tmp/models`。`start.sh` 要求 `/root/autodl-tmp/ComfyUI/extra_model_paths.yaml` 存在：
-
-- 使用 ComfyUI 默认模型目录时，文件内容写成 `{}`。
-- 使用独立模型目录时，文件内容如下：
-
-```yaml
-aigc_models:
-  base_path: /root/autodl-tmp/models
-  diffusion_models: diffusion_models
-  text_encoders: text_encoders
-  vae: vae
-  loras: loras
-  latent_upscale_models: latent_upscale_models
-```
-
-至少放好准备使用的工作流所需模型。冒烟测试使用 Qwen 文生图，需要：
+## 模型目录
 
 ```text
-models/diffusion_models/qwen_image_2512_bf16.safetensors
-models/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors
-models/vae/qwen_image_vae.safetensors
+/root/autodl-tmp/models/
+├── diffusion_models/
+│   ├── minimax_h3_ref2va_bf16.safetensors
+│   ├── minimax_h3_ref2va_int8_convrot.safetensors
+│   ├── minimax_h3_ref2va_pruned_bf16.safetensors
+│   ├── minimax_h3_ref2va_pruned_fp8_scaled.safetensors
+│   ├── minimax_h3_ref2va_pruned_int8_convrot.safetensors
+│   ├── qwen_image_2512_bf16.safetensors
+│   └── qwen_image_edit_2511_bf16.safetensors
+├── text_encoders/
+│   ├── qwen3vl_32b_minimax_h3_bf16.safetensors
+│   ├── qwen3vl_32b_minimax_h3_int8_convrot.safetensors
+│   ├── qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors
+│   └── qwen_2.5_vl_7b_fp8_scaled.safetensors
+├── vae/
+│   ├── minimax_h3_video_vae_fp16.safetensors
+│   ├── minimax_h3_audio_vae_fp32.safetensors
+│   └── qwen_image_vae.safetensors
+└── loras/
+    └── minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors
 ```
 
-其他模型的准确文件名以 `server/comfyui_api/app/workflows/*.json` 为准；缺少模型或自定义节点时，ComfyUI 日志会直接给出名称。
+`server/extra_model_paths.yaml` 已映射该目录，无需再修改 ComfyUI 配置。
 
-如需 LTX-2.3 IC-LoRA 工作流，先接受 Hugging Face 模型许可并登录，再下载补充模型：
-
-```bash
-python3 -m pip install -U huggingface_hub
-hf auth login
-
-cd /root/autodl-tmp/aigc/deploy_v2/server
-./download_ltx_2_3_official_models.sh
-```
-
-### 1.4 首次启动
+## 启动和停止
 
 ```bash
 cd /root/autodl-tmp/aigc/deploy_v2/server
-chmod +x start.sh stop.sh smoke_test.sh download_ltx_2_3_official_models.sh
+chmod +x start.sh stop.sh smoke_test.sh
 ./start.sh
-```
-
-`start.sh` 会自动完成以下工作：
-
-1. 检查 Python、ComfyUI、模型路径配置和存储目录。
-2. 创建 Gateway 和 ComfyUI API 各自的 `.venv` 并安装依赖。
-3. 依次启动 ComfyUI、ComfyUI API 和 Gateway。
-4. 等待健康检查通过，并把 PID、日志写入 `server/.runtime/`。
-
-首次安装依赖会稍慢；以后重复执行不会重复启动已经正常运行的服务。
-
-## 2. 一键启动和停止
-
-启动全部服务：
-
-```bash
-cd /root/autodl-tmp/aigc/deploy_v2/server
-./start.sh
-```
-
-停止由 `start.sh` 启动的全部服务：
-
-```bash
-cd /root/autodl-tmp/aigc/deploy_v2/server
-./stop.sh
-```
-
-修改 `config.yaml` 或更新代码后，执行一次停止再启动即可：
-
-```bash
-./stop.sh
-./start.sh
-```
-
-检查状态：
-
-```bash
 curl -sS http://127.0.0.1:8000/health
+./stop.sh
 ```
 
-正常结果类似：
+日志位于 `server/.runtime/logs/`。AutoDL 不开放 8000 端口时，可在本地建立 SSH 隧道：
+
+```bash
+ssh -N -L 8002:127.0.0.1:8000 -p <SSH端口> root@<SSH地址>
+```
+
+## API
+
+### MiniMax H3 Ref2VA
+
+`POST /v1/videos/minimax-h3-ref2va/generate`
 
 ```json
-{"status":"ok","services":{"comfyui_api":true}}
+{
+  "prompt": "Use <Picture 1> as the character reference.",
+  "images": ["<base64>"],
+  "videos": [],
+  "audios": [],
+  "diffusion_model": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+  "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+  "enable_lora": false,
+  "duration": 5,
+  "width": 1344,
+  "height": 768,
+  "steps": 20,
+  "seed": 42
+}
 ```
 
-## 3. 冒烟测试
+- `images` 0–9 张，`videos` 0–3 段，`audios` 0–3 段，合计至少一个。
+- 参考标签为 `<Picture 1>`、`<Video 1>` 和 `<Audio 1>`。
+- 视频内嵌音轨会自动作为对应视频的参考音频。
+- LoRA 关闭时 `steps` 可设置，默认 20；LoRA 开启时固定为 4 步。
+- 视频固定 24 fps，请求时长会对齐到 MiniMax H3 帧数网格，响应会返回 `frames` 和 `actual_duration`。
 
-服务启动后执行：
+### Qwen Image 2512
+
+`POST /v1/images/qwen-image-2512/generate`
+
+```json
+{
+  "prompt": "A cinematic portrait",
+  "negative_prompt": "low quality",
+  "width": 1328,
+  "height": 1328,
+  "steps": 50,
+  "cfg": 4,
+  "seed": 42
+}
+```
+
+### Qwen Image Edit 2511
+
+`POST /v1/images/qwen-image-edit-2511/edit`
+
+```json
+{
+  "images": ["<main-image-base64>", "<reference-base64>"],
+  "prompt": "Use the second image as a style reference",
+  "negative_prompt": "",
+  "width": 1024,
+  "height": 1024,
+  "steps": 40,
+  "cfg": 4,
+  "seed": 42
+}
+```
+
+支持 1–3 张图片，第一张是主编辑图，其余为附加参考图。工作流不使用 LoRA。
+
+三个接口都同步等待 ComfyUI 完成，并以 Base64 数组返回 `images` 或 `videos`。完整参数可查看 `http://127.0.0.1:8100/docs`。
+
+## 客户端示例
 
 ```bash
-cd /root/autodl-tmp/aigc/deploy_v2/server
-./smoke_test.sh
-```
-
-脚本会依次：
-
-1. 检查 Gateway、ComfyUI API 和 ComfyUI 是否正常。
-2. 调用 Qwen 文生图接口完成一次真实推理。
-3. 将结果保存到 `server/.runtime/smoke-test.png`。
-
-看到下面两行即表示服务链路已跑通：
-
-```text
-[smoke] 健康检查通过: ...
-[smoke] 端到端文生图通过: .../smoke-test.png
-```
-
-可自定义提示词和输出路径：
-
-```bash
-SMOKE_PROMPT="A cat sitting by the window" \
-SMOKE_OUTPUT=/root/autodl-tmp/smoke.png \
-./smoke_test.sh
-```
-
-## 4. 配置和目录
-
-主要配置文件是 `server/config.yaml`：
-
-```yaml
-gateway:
-  host: 0.0.0.0
-  port: 8000
-
-services:
-  comfyui_api:
-    host: 127.0.0.1
-    port: 8100
-    comfyui_url: http://127.0.0.1:8188
-```
-
-- `8000`：对外 Gateway。
-- `8100`：内部 ComfyUI API，不需要开放公网。
-- `8188`：内部 ComfyUI，不需要开放公网。
-- ComfyUI 输入、输出和临时文件默认位于 `/root/autodl-tmp/comfyui/`。
-
-常用环境变量：
-
-```bash
-COMFYUI_DIR=/root/autodl-tmp/ComfyUI \
-COMFYUI_FILE_STORAGE_ROOT=/root/autodl-tmp \
-STARTUP_TIMEOUT=300 \
-./start.sh
-```
-
-## 5. 日志和常见问题
-
-查看日志：
-
-```bash
-tail -f /root/autodl-tmp/aigc/deploy_v2/server/.runtime/logs/comfyui.log
-tail -f /root/autodl-tmp/aigc/deploy_v2/server/.runtime/logs/comfyui-api.log
-tail -f /root/autodl-tmp/aigc/deploy_v2/server/.runtime/logs/gateway.log
-```
-
-常见问题：
-
-- `找不到 extra_model_paths.yaml`：按“准备模型”一节创建该文件。
-- `端口已被占用`：先执行 `./stop.sh`，再用 `ss -lntp | grep -E '8000|8100|8188'` 检查残留进程。
-- `ComfyUI workflow 执行失败`：优先查看 `comfyui.log`，通常是缺少模型或自定义节点。
-- 启动等待超时：使用 `STARTUP_TIMEOUT=300 ./start.sh`，并同步查看日志。
-- Gateway 健康状态为 `degraded`：说明 Gateway 已启动，但 ComfyUI API 或 ComfyUI 未就绪。
-
-## 6. 从本地访问 AutoDL
-
-AutoDL 通常不直接开放 `8000` 端口，可在本地建立 SSH 隧道：
-
-```bash
-ssh -N -L 8002:127.0.0.1:8000 \
-  -p <AutoDL SSH端口> root@<AutoDL SSH地址>
-```
-
-然后在本地使用 `http://127.0.0.1:8002`：
-
-```bash
-cd aigc/deploy_v2/client
+cd /root/autodl-tmp/aigc/deploy_v2/client
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
-./.venv/bin/python example.py text-to-image \
-  --base-url http://127.0.0.1:8002 \
-  --prompt "A cinematic portrait at night"
+
+./.venv/bin/python example.py qwen-generate \
+  --prompt "A cinematic portrait"
+
+./.venv/bin/python example.py qwen-edit \
+  --image main.png --image reference.png \
+  --prompt "Use the second image as a style reference"
+
+./.venv/bin/python example.py minimax-h3 \
+  --image character.png --audio voice.wav \
+  --prompt "<Picture 1> speaks with <Audio 1>." \
+  --steps 20
 ```
 
-## 7. 主要 API
+## 测试
 
-| 能力 | 接口 |
-|---|---|
-| 健康检查 | `GET /health` |
-| Qwen 文生图 | `POST /v1/images/qwen-image-2512/generate` |
-| Qwen 单图编辑 | `POST /v1/images/qwen-image-edit-2511/edit` |
-| Qwen 单图 Lightning 编辑 | `POST /v1/images/qwen-image-edit-2511/edit-lightning-4step` |
-| Qwen 多图编辑 | `POST /v1/images/qwen-image-edit-2511/edit-multi` |
-| Qwen 多图 Lightning 编辑 | `POST /v1/images/qwen-image-edit-2511/edit-multi-lightning-4step` |
-| LTX 文/图生视频 | `POST /v1/videos/ltx_2d3_t2v_i2v_two_stage_distilled` |
-| LTX 文生音频 | `POST /v1/audio/ltx_2d3_t2a_single_stage_distilled` |
-| MiniMax H3 BF16 | `POST /v1/videos/minimax_h3_ref2va_bf16` |
-| MiniMax H3 量化版 | `POST /v1/videos/minimax_h3_ref2va_quantized` |
+```bash
+cd /root/autodl-tmp/aigc/deploy_v2/server/comfyui_api
+PYTHONPATH=. .venv/bin/python -m unittest discover -s tests -v
 
-全部接口和参数可在 AutoDL 实例内查看 ComfyUI API 的在线文档：
-
-```text
-http://127.0.0.1:8100/docs
+cd /root/autodl-tmp/aigc/deploy_v2/server
+bash tests/deploy_scripts_test.sh
+./smoke_test.sh
 ```
 
-当前请求会一直等待 ComfyUI 工作流完成，并以 Base64 返回结果。它适合单机部署和低并发调用；高并发场景需要另行增加任务队列和对象存储。
+`smoke_test.sh` 会通过 Qwen Image 2512 执行一次真实端到端推理。MiniMax H3 可使用上面的客户端命令验证。
+
+官方工作流：
+
+- https://github.com/Comfy-Org/workflow_templates/blob/main/templates/video_minimax_h3_r2v.json
+- https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_qwen_Image_2512.json
+- https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_qwen_image_edit_2511.json

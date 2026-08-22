@@ -2,7 +2,7 @@
   "92": {
     "inputs": {
       "video": ["130", 0],
-      "filename_prefix": "video/minimax_h3_ref2va_quantized",
+      "filename_prefix": "video/minimax_h3_ref2va_api",
       "format": "auto",
       "codec": "auto"
     },
@@ -62,20 +62,20 @@
   },
   "127": {
     "inputs": {
-      "unet_name": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "unet_name": "minimax_h3_ref2va_bf16.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
-    "_meta": {"title": "Load MiniMax H3 REF2VA Pruned INT8"}
+    "_meta": {"title": "Load MiniMax H3 REF2VA BF16"}
   },
   "128": {
     "inputs": {
-      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "clip_name": "qwen3vl_32b_minimax_h3_bf16.safetensors",
       "type": "minimax",
       "device": "default"
     },
     "class_type": "CLIPLoader",
-    "_meta": {"title": "Load Qwen3-VL 32B NVFP4 AWQ"}
+    "_meta": {"title": "Load Qwen3-VL 32B BF16"}
   },
   "129": {
     "inputs": {"noise_seed": 42},

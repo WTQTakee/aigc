@@ -73,8 +73,8 @@
   },
   "68": {
     "inputs": {
-      "width": 720,
-      "height": 1280,
+      "width": 1328,
+      "height": 1328,
       "batch_size": 1
     },
     "class_type": "EmptySD3LatentImage",
@@ -98,9 +98,9 @@
   "70": {
     "inputs": {
       "seed": 511780879727845,
-      "steps": 8,
-      "cfg": 1,
-      "sampler_name": "res_multistep",
+      "steps": 50,
+      "cfg": 4,
+      "sampler_name": "euler",
       "scheduler": "simple",
       "denoise": 1,
       "model": [
@@ -136,18 +136,6 @@
     "class_type": "CLIPTextEncode",
     "_meta": {
       "title": "CLIP文本编码"
-    }
-  },
-  "72": {
-    "inputs": {
-      "images": [
-        "65",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "预览图像"
     }
   }
 }

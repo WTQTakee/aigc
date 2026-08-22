@@ -5,7 +5,7 @@ from pathlib import Path
 import requests
 
 
-def image_base64(path: str) -> str:
+def file_base64(path: str) -> str:
     return base64.b64encode(Path(path).read_bytes()).decode()
 
 
@@ -21,41 +21,57 @@ def request_and_save(url: str, payload: dict, result_key: str, output: str) -> N
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="AIGC API 调用示例")
-    parser.add_argument("command", choices=("text-to-image", "edit-image", "text-to-video", "image-to-video"))
-    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("command", choices=("qwen-generate", "qwen-edit", "minimax-h3"))
+    parser.add_argument("--base-url", default="http://127.0.0.1:8002")
     parser.add_argument("--prompt", required=True)
-    parser.add_argument("--input", help="图片编辑或图生视频的输入图片")
+    parser.add_argument("--image", action="append", default=[])
+    parser.add_argument("--video", action="append", default=[])
+    parser.add_argument("--audio", action="append", default=[])
+    parser.add_argument("--width", type=int)
+    parser.add_argument("--height", type=int)
+    parser.add_argument("--steps", type=int)
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--enable-lora", action="store_true")
     parser.add_argument("--output")
     args = parser.parse_args()
     base_url = args.base_url.rstrip("/")
+    common = {"prompt": args.prompt}
+    for name in ("width", "height", "steps", "seed"):
+        value = getattr(args, name)
+        if value is not None:
+            common[name] = value
 
-    if args.command == "text-to-image":
+    if args.command == "qwen-generate":
         request_and_save(
             f"{base_url}/v1/images/qwen-image-2512/generate",
-            {"prompt": args.prompt},
+            common,
             "images",
             args.output or "qwen-image.png",
         )
-    elif args.command == "edit-image":
-        if not args.input:
-            parser.error("edit-image 需要 --input")
+    elif args.command == "qwen-edit":
+        if not args.image:
+            parser.error("qwen-edit 至少需要一个 --image")
+        common["images"] = [file_base64(path) for path in args.image]
         request_and_save(
             f"{base_url}/v1/images/qwen-image-edit-2511/edit",
-            {"image": image_base64(args.input), "prompt": args.prompt},
+            common,
             "images",
             args.output or "qwen-image-edit.png",
         )
     else:
-        payload = {"prompt": args.prompt}
-        if args.command == "image-to-video":
-            if not args.input:
-                parser.error("image-to-video 需要 --input")
-            payload["image"] = image_base64(args.input)
+        if not (args.image or args.video or args.audio):
+            parser.error("minimax-h3 至少需要一个参考媒体")
+        common.update(
+            images=[file_base64(path) for path in args.image],
+            videos=[file_base64(path) for path in args.video],
+            audios=[file_base64(path) for path in args.audio],
+            enable_lora=args.enable_lora,
+        )
         request_and_save(
-            f"{base_url}/v1/videos/ltx_2d3_t2v_i2v_two_stage_distilled",
-            payload,
+            f"{base_url}/v1/videos/minimax-h3-ref2va/generate",
+            common,
             "videos",
-            args.output or f"ltx-{args.command}.mp4",
+            args.output or "minimax-h3.mp4",
         )
 
 
