@@ -4,4 +4,3 @@ aigc_models:
   text_encoders: text_encoders
   vae: vae
   loras: loras
-
