@@ -22,7 +22,10 @@ def request_and_save(url: str, payload: dict, result_key: str, output: str) -> N
 def main() -> None:
     parser = argparse.ArgumentParser(description="AIGC API 调用示例")
     parser.add_argument("command", choices=("qwen-generate", "qwen-edit", "minimax-h3"))
-    parser.add_argument("--base-url", default="http://127.0.0.1:8002")
+    parser.add_argument(
+        "--base-url",
+        default="https://u743245-6dat-d16e8d25.bjb1.seetacloud.com:8443",
+    )
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--image", action="append", default=[])
     parser.add_argument("--video", action="append", default=[])

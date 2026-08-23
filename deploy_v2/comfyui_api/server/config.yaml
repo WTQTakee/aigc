@@ -1,6 +1,6 @@
 gateway:
   host: 0.0.0.0
-  port: 8000
+  port: 6006
   request_timeout: 3600
   routes:
     /v1/images: comfyui_api

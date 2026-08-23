@@ -4,7 +4,7 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 RUNTIME_DIR="${AIGC_RUNTIME_DIR:-${SCRIPT_DIR}/.runtime}"
-GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:8000}"
+GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:6006}"
 SMOKE_OUTPUT="${SMOKE_OUTPUT:-${RUNTIME_DIR}/smoke-test.png}"
 SMOKE_PROMPT="${SMOKE_PROMPT:-A small red paper boat on a calm lake, cinematic light}"
 SMOKE_TIMEOUT="${SMOKE_TIMEOUT:-3600}"
